@@ -25,7 +25,12 @@
 #include <unistd.h>
 #include <vector>
 
+// [BB-JAZZY] Jazzy 起 cv_bridge 头文件改名为 cv_bridge.hpp（Humble 及更早为 cv_bridge.h）。
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+#include <cv_bridge/cv_bridge.hpp>
+#else
 #include <cv_bridge/cv_bridge.h>
+#endif
 #include <ros/ros.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>

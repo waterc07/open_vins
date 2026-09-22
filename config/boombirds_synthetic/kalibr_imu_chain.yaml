@@ -1,0 +1,56 @@
+%YAML:1.0
+# =============================================================================
+# Boom Birds / OpenVINS IMU 链  ---  TEST-ONLY / SYNTHETIC ONLY
+# =============================================================================
+# 【待硬件实测】以下四项 IMU 噪声全部是占位 0.0，不是真机 Allan 方差结果：
+#   gyroscope_noise_density / gyroscope_random_walk
+#   accelerometer_noise_density / accelerometer_random_walk
+# 占位 0.0 只保证配置能被解析、节点能启动；过程噪声为 0 时滤波结果无意义，
+# 接入真机数据前必须用 Allan 方差实测替换（单位: rad/s/sqrt(Hz)、m/s^2/sqrt(Hz)、
+# rad/s^2/sqrt(Hz)、m/s^3/sqrt(Hz)）。本文件不包含任何真机测量值。
+# =============================================================================
+
+imu0:
+  T_i_b:
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  # TEST-ONLY 占位（待硬件实测: Allan 方差）
+  accelerometer_noise_density: 0.0
+  accelerometer_random_walk: 0.0
+  gyroscope_noise_density: 0.0
+  gyroscope_random_walk: 0.0
+  rostopic: /boom_birds/imu
+  time_offset: 0.0
+  update_rate: 200 # 占位；Boom Birds IMU 实际频率待硬件实测（ov_msckf 不读该字段）
+  # three different modes supported:
+  # "calibrated" (same as "kalibr"), "kalibr", "rpng"
+  model: "kalibr"
+  # TEST-ONLY: 未做 IMU 内参标定，全部为无失真占位（待硬件实测）
+  # how to get from Kalibr imu.yaml result file:
+  #   - Tw is imu0:gyroscopes:M:
+  #   - R_IMUtoGYRO: is imu0:gyroscopes:C_gyro_i:
+  #   - Ta is imu0:accelerometers:M:
+  #   - R_IMUtoACC not used by Kalibr
+  #   - Tg is imu0:gyroscopes:A:
+  Tw:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  R_IMUtoGYRO:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  Ta:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  R_IMUtoACC:
+    - [ 1.0, 0.0, 0.0 ]
+    - [ 0.0, 1.0, 0.0 ]
+    - [ 0.0, 0.0, 1.0 ]
+  Tg:
+    - [ 0.0, 0.0, 0.0 ]
+    - [ 0.0, 0.0, 0.0 ]
+    - [ 0.0, 0.0, 0.0 ]

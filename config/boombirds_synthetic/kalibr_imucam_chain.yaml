@@ -1,0 +1,63 @@
+%YAML:1.0
+# =============================================================================
+# Boom Birds / OpenVINS 相机-IMU 链  ---  TEST-ONLY / SYNTHETIC ONLY
+# =============================================================================
+# 本文件全部为【合成】占位标定，无一项来自 Boom Birds 真机标定，也未做精度验证。
+#
+# 像素内参来源（合成）: 主 agent 提供的合成标定 f≈690.39, cx≈627.45, cy≈464.60
+#   仅给出单一 f，本文件按 fx=fy=690.39 处理（合成假设）。
+# 分辨率来源: 1280x960。主 agent 未直接给出分辨率，此处按本机每目原始分辨率取
+#   （companion/ros2_ws/src/stereo_depth/LIVE_CALIBRATION.md: 拼接总图 2560x960,
+#    每目 1280x960），且与 cx<1280/2、cy<960/2 的量级一致。若与主 agent 的合成
+#    数据生成器不一致，以生成器为准并同步修改此处。
+# 注意: 这些合成值与 stereo_depth/calibration/live_20260916_210120_642136 中记录的
+#   真机标定候选（fx≈649.39/648.93, cx≈630.20, cy≈471.53, baseline≈0.06767 m）
+#   不同，二者不可混用；真机参数必须走真机标定流程。
+#
+# T_imu_cam 字段语义（源码事实, 已核验）:
+#   ov_msckf/src/core/VioManagerOptions.h:263-269 与
+#   ov_init/src/init/InertialInitializerOptions.h:298-304 读取键 "T_imu_cam" 到变量
+#   T_CtoI，随后用 R^T / -R^T*t 转成 (q_ItoC, p_IinC)。因此该 4x4 矩阵是
+#   T_I_Ci（相机系 -> IMU 系）: p_I = T_imu_cam * p_Ci，
+#   即 R = R_CitoI、t = p_CiinI（相机原点在 IMU 系下的位置）。
+#   若改用 Kalibr 惯用的 "T_cam_imu" 键（IMU -> 相机），
+#   ov_core/src/utils/opencv_yaml_parse.h:488-535 会自动求逆，两种键名都支持；
+#   本文件统一使用 "T_imu_cam" 以避免歧义。
+#
+# 合成外参假设（待硬件实测/待真机标定）:
+#   - IMU 与 cam0 光学中心重合、两目与 IMU 姿态相同（单位旋转占位）。
+#   - cam0 与 cam1 只差一个沿 x 的基线 0.06772 m（cam1 在 cam0 右侧 +x），
+#     即 T_I_C1 平移到 (0.06772, 0, 0)；未使用任何真机外参。
+#   - timeshift_cam_imu 占位 0.0（真实时间偏移待硬件实测）。
+#   - 畸变全部为 0（radtan 占位），真机畸变待标定。
+# =============================================================================
+
+cam0:
+  T_imu_cam: # = T_I_C0 (camera0 -> IMU); 见文件头说明
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: [1]
+  camera_model: pinhole
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0] # TEST-ONLY 占位，待真机标定
+  distortion_model: radtan
+  intrinsics: [690.39, 690.39, 627.45, 464.60] # fu, fv, cu, cv (合成, 待真机标定)
+  resolution: [1280, 960] # 合成/本机每目分辨率, 见文件头
+  rostopic: /boom_birds/stereo/left_raw
+  timeshift_cam_imu: 0.0 # TEST-ONLY 占位，待硬件实测
+
+cam1:
+  T_imu_cam: # = T_I_C1 (camera1 -> IMU); 平移到基线 0.06772 m，见文件头说明
+    - [1.0, 0.0, 0.0, 0.06772]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: [0]
+  camera_model: pinhole
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0] # TEST-ONLY 占位，待真机标定
+  distortion_model: radtan
+  intrinsics: [690.39, 690.39, 627.45, 464.60] # fu, fv, cu, cv (合成, 待真机标定)
+  resolution: [1280, 960] # 合成/本机每目分辨率, 见文件头
+  rostopic: /boom_birds/stereo/right_raw
+  timeshift_cam_imu: 0.0 # TEST-ONLY 占位，待硬件实测
