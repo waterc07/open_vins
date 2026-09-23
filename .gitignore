@@ -8,3 +8,11 @@ doxgen_generated
 *.swo
 doc
 .vscode
+
+# Boom_Birds local run outputs; preserve on disk, exclude from new commits
+log/
+*.log
+*.bag
+*.db3
+*.mcap
+*.jsonl
