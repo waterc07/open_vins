@@ -1,3 +1,9 @@
+> Boom_Birds fork note: benchmark ground-truth and evaluation tables under
+> `ov_data/` and `ov_eval/example/` are kept locally but excluded from new
+> commits. The `ov_data/sim/` trajectories and MATLAB conversion scripts remain
+> tracked. Obtain removed reference tables from the upstream OpenVINS repository
+> if running its original benchmark/evaluation examples.
+
 # OpenVINS
 
 [![ROS 1 Workflow](https://github.com/rpng/open_vins/actions/workflows/build_ros1.yml/badge.svg)](https://github.com/rpng/open_vins/actions/workflows/build_ros1.yml)

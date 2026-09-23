@@ -16,3 +16,12 @@ log/
 *.db3
 *.mcap
 *.jsonl
+
+
+# Upstream ground-truth/evaluation tables are local reference data, not build inputs.
+/ov_data/**/*.csv
+/ov_data/**/*.txt
+!/ov_data/CMakeLists.txt
+!/ov_data/sim/*.txt
+/ov_data/**/*.mat
+/ov_eval/example/stamped_*.txt
