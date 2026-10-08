@@ -20,6 +20,9 @@
  */
 
 #include "ROS2Visualizer.h"
+#include "bounded_camera_queue.h"
+#include <cmath>
+#include <stdexcept>
 
 #include "core/VioManager.h"
 #include "ros/ROSVisualizerHelper.h"
@@ -37,6 +40,13 @@ using namespace ov_msckf;
 
 ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_ptr<VioManager> app, std::shared_ptr<Simulator> sim)
     : _node(node), _app(app), _sim(sim), thread_update_running(false) {
+
+  const int max_count = node->declare_parameter<int>("camera_queue_max_count", 10);
+  camera_queue_max_span_s = node->declare_parameter<double>("camera_queue_max_span_s", 0.5);
+  if (max_count < 1 || !std::isfinite(camera_queue_max_span_s) || camera_queue_max_span_s <= 0) {
+    throw std::invalid_argument("camera queue limits must be positive and finite");
+  }
+  camera_queue_max_count = static_cast<size_t>(max_count);
 
   // Setup our transform broadcaster
   mTfBr = std::make_shared<tf2_ros::TransformBroadcaster>(node);
@@ -531,7 +541,13 @@ void ROS2Visualizer::callback_monocular(const sensor_msgs::msg::Image::SharedPtr
   // append it to our queue of images
   std::lock_guard<std::mutex> lck(camera_queue_mtx);
   camera_queue.push_back(message);
-  std::sort(camera_queue.begin(), camera_queue.end());
+  const auto dropped = trim_camera_queue(camera_queue, camera_queue_max_count, camera_queue_max_span_s);
+  camera_queue_dropped += dropped;
+  if (dropped != 0) {
+    RCLCPP_WARN_THROTTLE(_node->get_logger(), *_node->get_clock(), 5000,
+                         "camera queue overflow: dropped=%zu total=%zu remaining=%zu; check IMU/processing backlog",
+                         dropped, camera_queue_dropped, camera_queue.size());
+  }
 }
 
 void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedPtr msg0, const sensor_msgs::msg::Image::ConstSharedPtr msg1,
@@ -585,7 +601,13 @@ void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedP
   // append it to our queue of images
   std::lock_guard<std::mutex> lck(camera_queue_mtx);
   camera_queue.push_back(message);
-  std::sort(camera_queue.begin(), camera_queue.end());
+  const auto dropped = trim_camera_queue(camera_queue, camera_queue_max_count, camera_queue_max_span_s);
+  camera_queue_dropped += dropped;
+  if (dropped != 0) {
+    RCLCPP_WARN_THROTTLE(_node->get_logger(), *_node->get_clock(), 5000,
+                         "camera queue overflow: dropped=%zu total=%zu remaining=%zu; check IMU/processing backlog",
+                         dropped, camera_queue_dropped, camera_queue.size());
+  }
 }
 
 void ROS2Visualizer::publish_state() {

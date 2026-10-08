@@ -197,6 +197,9 @@ protected:
   /// a nice feature to have for general robustness to bad camera drivers.
   std::deque<ov_core::CameraData> camera_queue;
   std::mutex camera_queue_mtx;
+  size_t camera_queue_max_count = 10;
+  double camera_queue_max_span_s = 0.5;
+  size_t camera_queue_dropped = 0;
 
   // Last camera message timestamps we have received (mapped by cam id)
   std::map<int, double> camera_last_timestamp;
