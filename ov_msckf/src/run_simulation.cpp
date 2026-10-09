@@ -183,6 +183,10 @@ int main(int argc, char **argv) {
   ros::shutdown();
 #elif ROS_AVAILABLE == 2
   viz->visualize_final();
+  // Release publishers while the ROS context is still alive.
+  viz.reset();
+  sys.reset();
+  sim.reset();
   rclcpp::shutdown();
 #endif
 
