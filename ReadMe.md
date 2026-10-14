@@ -188,4 +188,15 @@ following:
 The codebase and documentation is licensed under the [GNU General Public License v3 (GPL-3)](https://www.gnu.org/licenses/gpl-3.0.txt).
 You must preserve the copyright and license notices in your derivative work and make available the complete source code with modifications under the same license ([see this](https://choosealicense.com/licenses/gpl-3.0/); this is not legal advice).
 
+## 项目 ROS 2 回放退出模式
 
+`run_subscribe_msckf` 的 `graceful_shutdown` 参数默认 false。Gazebo 离线回放显式设置 true：
+
+```bash
+ros2 run ov_msckf run_subscribe_msckf /absolute/path/estimator_config.yaml \
+  --ros-args -p graceful_shutdown:=true
+```
+
+启用后使用同步图像回调和同步可视化发布，SIGINT/SIGTERM 只设置退出标志。主循环退出后先执行最终可视化、释放 visualizer 和 VioManager，再关闭 ROS context，避免发布器晚于 context 销毁。
+
+此模式用于有界离线回放，不替换默认在线多线程行为，也不构成 Pi 实时性或真实 VIO 验收。

@@ -19,7 +19,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <chrono>
+#include <csignal>
 #include <memory>
+#include <thread>
 
 #include "core/VioManager.h"
 #include "core/VioManagerOptions.h"
@@ -34,6 +37,13 @@
 #endif
 
 using namespace ov_msckf;
+
+#if ROS_AVAILABLE == 2
+namespace {
+volatile std::sig_atomic_t stop_requested = 0;
+void request_stop(int) { stop_requested = 1; }
+} // namespace
+#endif
 
 std::shared_ptr<VioManager> sys;
 #if ROS_AVAILABLE == 1
@@ -64,6 +74,13 @@ int main(int argc, char **argv) {
   options.automatically_declare_parameters_from_overrides(true);
   auto node = std::make_shared<rclcpp::Node>("run_subscribe_msckf", options);
   node->get_parameter<std::string>("config_path", config_path);
+  bool graceful_shutdown = false;
+  node->get_parameter_or<bool>("graceful_shutdown", graceful_shutdown, false);
+  if (graceful_shutdown) {
+    rclcpp::uninstall_signal_handlers();
+    std::signal(SIGINT, request_stop);
+    std::signal(SIGTERM, request_stop);
+  }
 #endif
 
   // Load the config
@@ -83,6 +100,13 @@ int main(int argc, char **argv) {
   VioManagerOptions params;
   params.print_and_load(parser);
   params.use_multi_threading_subs = true;
+#if ROS_AVAILABLE == 2
+  // 可选回放模式：在线程退出后释放发布者，再关闭 ROS context。
+  if (graceful_shutdown) {
+    params.use_multi_threading_subs = false;
+    params.use_multi_threading_pubs = false;
+  }
+#endif
   sys = std::make_shared<VioManager>(params);
 #if ROS_AVAILABLE == 1
   viz = std::make_shared<ROS1Visualizer>(nh, sys);
@@ -109,7 +133,14 @@ int main(int argc, char **argv) {
   // rclcpp::spin(node);
   rclcpp::executors::MultiThreadedExecutor executor;
   executor.add_node(node);
-  executor.spin();
+  if (graceful_shutdown) {
+    while (rclcpp::ok() && !stop_requested) {
+      executor.spin_some();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  } else {
+    executor.spin();
+  }
 #endif
 
   // Final visualization
@@ -117,6 +148,10 @@ int main(int argc, char **argv) {
 #if ROS_AVAILABLE == 1
   ros::shutdown();
 #elif ROS_AVAILABLE == 2
+  if (graceful_shutdown) {
+    viz.reset();
+    sys.reset();
+  }
   rclcpp::shutdown();
 #endif
 
