@@ -305,6 +305,8 @@ void VioManager::track_image_and_update(const ov_core::CameraData &message_const
     }
   }
 
+  did_zupt_update = false;
+
   // If we do not have VIO initialization, then try to initialize
   // TODO: Or if we are trying to reset the system, then do that here!
   if (!is_initialized_vio) {
@@ -544,6 +546,7 @@ void VioManager::do_feature_propagate_update(const ov_core::CameraData &message)
   }
   feats_slam_UPDATE = feats_slam_UPDATE_TEMP;
   rT5 = boost::posix_time::microsec_clock::local_time();
+  visual_update_status.record(message.timestamp, featsup_MSCKF.size() + feats_slam_UPDATE.size());
   updaterSLAM->delayed_init(state, feats_slam_DELAYED);
   rT6 = boost::posix_time::microsec_clock::local_time();
 

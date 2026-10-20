@@ -23,6 +23,8 @@
 #include "bounded_camera_queue.h"
 #include <cmath>
 #include <stdexcept>
+#include <sstream>
+#include <iomanip>
 
 #include "core/VioManager.h"
 #include "ros/ROSVisualizerHelper.h"
@@ -48,6 +50,12 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   }
   camera_queue_max_count = static_cast<size_t>(max_count);
 
+  node->get_parameter_or<double>("visual_update_timeout_s", visual_update_timeout_s, 0.5);
+  if (!node->has_parameter("visual_update_timeout_s"))
+    node->declare_parameter<double>("visual_update_timeout_s", visual_update_timeout_s);
+  if (!std::isfinite(visual_update_timeout_s) || visual_update_timeout_s <= 0)
+    throw std::invalid_argument("visual_update_timeout_s must be positive and finite");
+
   // Setup our transform broadcaster
   mTfBr = std::make_shared<tf2_ros::TransformBroadcaster>(node);
 
@@ -61,6 +69,10 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   PRINT_DEBUG("Publishing: %s\n", pub_odomimu->get_topic_name());
   pub_pathimu = node->create_publisher<nav_msgs::msg::Path>("pathimu", 2);
   PRINT_DEBUG("Publishing: %s\n", pub_pathimu->get_topic_name());
+
+  pub_state_poseimu = node->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("state_poseimu", 2);
+  pub_state_odomimu = node->create_publisher<nav_msgs::msg::Odometry>("state_odomimu", 2);
+  pub_status = node->create_publisher<std_msgs::msg::String>("status", 10);
 
   // 3D points publishing
   pub_points_msckf = node->create_publisher<sensor_msgs::msg::PointCloud2>("points_msckf", 2);
@@ -231,7 +243,7 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
 void ROS2Visualizer::visualize() {
 
   // Return if we have already visualized
-  if (last_visualization_timestamp == _app->get_state()->_timestamp && _app->initialized())
+  if (last_visualization_timestamp == _app->get_state()->_timestamp && _app->state_initialized())
     return;
   last_visualization_timestamp = _app->get_state()->_timestamp;
 
@@ -244,7 +256,7 @@ void ROS2Visualizer::visualize() {
     publish_images();
 
   // Return if we have not inited
-  if (!_app->initialized())
+  if (!_app->state_initialized())
     return;
 
   // Save the start time of this dataset
@@ -256,14 +268,11 @@ void ROS2Visualizer::visualize() {
   // publish state
   publish_state();
 
-  // publish points
-  publish_features();
-
-  // Publish gt if we have it
-  publish_groundtruth();
-
-  // Publish keyframe information
-  publish_loopclosure_information();
+  if (_app->visual_updates().fresh(_app->get_state()->_timestamp, visual_update_timeout_s)) {
+    publish_features();
+    publish_groundtruth();
+    publish_loopclosure_information();
+  }
 
   // Save total state
   if (save_total_state) {
@@ -279,7 +288,7 @@ void ROS2Visualizer::visualize() {
 void ROS2Visualizer::visualize_odometry(double timestamp) {
 
   // Return if we have not inited and a second has passes
-  if (!_app->initialized() || (timestamp - _app->initialized_time()) < 1)
+  if (!_app->state_initialized() || (timestamp - _app->initialized_time()) < 1)
     return;
 
   // Get fast propagate state at the desired timestamp
@@ -289,8 +298,10 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
   if (!_app->get_propagator()->fast_state_propagate(state, timestamp, state_plus, cov_plus))
     return;
 
-  // Publish our odometry message if requested
-  if (pub_odomimu->get_subscription_count() != 0) {
+  const bool tracking_ready = _app->visual_updates().fresh(
+      timestamp - state->_calib_dt_CAMtoIMU->value()(0), visual_update_timeout_s);
+  // State topics expose initialization/ZUPT/propagation; navigation topics require a recent visual update.
+  if (pub_odomimu->get_subscription_count() != 0 || pub_state_odomimu->get_subscription_count() != 0) {
 
     // Our odometry message
     nav_msgs::msg::Odometry odomIinM;
@@ -331,7 +342,9 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
         odomIinM.twist.covariance[6 * r + c] = cov_plus(r + 6, c + 6);
       }
     }
-    pub_odomimu->publish(odomIinM);
+    pub_state_odomimu->publish(odomIinM);
+    if (tracking_ready)
+      pub_odomimu->publish(odomIinM);
   }
 
   // Publish our transform on TF
@@ -343,7 +356,7 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
   trans.header.stamp = _node->now();
   trans.header.frame_id = "global";
   trans.child_frame_id = "imu";
-  if (publish_global2imu_tf) {
+  if (publish_global2imu_tf && tracking_ready) {
     mTfBr->sendTransform(trans);
   }
 
@@ -455,6 +468,7 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
 
   // send it to our VIO system
   _app->feed_measurement_imu(message);
+  publish_status(message.timestamp);
   visualize_odometry(message.timestamp);
 
   // If the processing queue is currently active / running just return so we can keep getting measurements
@@ -610,6 +624,36 @@ void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedP
   }
 }
 
+void ROS2Visualizer::publish_status(double timestamp_in_imu) {
+  const int64_t now_ns = _node->now().nanoseconds();
+  if (now_ns >= last_status_publish_ns && now_ns - last_status_publish_ns < 200000000)
+    return;
+  last_status_publish_ns = now_ns;
+  const auto &updates = _app->visual_updates();
+  const bool initialized = _app->state_initialized();
+  const double time_in_camera = timestamp_in_imu - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
+  const bool tracking_ready = initialized && updates.fresh(time_in_camera, visual_update_timeout_s);
+  std::ostringstream json;
+  json << std::boolalpha << std::setprecision(17)
+       << "{\"schema_version\":1,\"stamp_ns\":" << now_ns
+       << ",\"input_stamp_s\":" << timestamp_in_imu
+       << ",\"state_initialized\":" << initialized
+       << ",\"zero_velocity_update\":" << _app->zero_velocity_update_active()
+       << ",\"visual_tracking_ready\":" << tracking_ready
+       << ",\"visual_update_count\":" << updates.count()
+       << ",\"last_visual_feature_count\":" << updates.features()
+       << ",\"visual_update_timeout_s\":" << visual_update_timeout_s
+       << ",\"last_visual_update_stamp_s\":";
+  if (updates.count() != 0)
+    json << updates.timestamp();
+  else
+    json << "null";
+  json << "}";
+  std_msgs::msg::String message;
+  message.data = json.str();
+  pub_status->publish(message);
+}
+
 void ROS2Visualizer::publish_state() {
 
   // Get the current state
@@ -642,6 +686,9 @@ void ROS2Visualizer::publish_state() {
       poseIinM.pose.covariance[6 * r + c] = covariance_posori(r, c);
     }
   }
+  pub_state_poseimu->publish(poseIinM);
+  if (!_app->visual_updates().fresh(state->_timestamp, visual_update_timeout_s))
+    return;
   pub_poseimu->publish(poseIinM);
 
   //=========================================================

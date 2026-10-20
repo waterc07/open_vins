@@ -45,6 +45,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/transform_datatypes.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -132,6 +133,7 @@ public:
 protected:
   /// Publish the current state
   void publish_state();
+  void publish_status(double timestamp_in_imu);
 
   /// Publish the active tracking image
   void publish_images();
@@ -158,6 +160,11 @@ protected:
   image_transport::Publisher it_pub_tracks, it_pub_loop_img_depth, it_pub_loop_img_depth_color;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_poseimu;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odomimu;
+  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_state_poseimu;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_state_odomimu;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_status;
+  double visual_update_timeout_s = 0.5;
+  int64_t last_status_publish_ns = 0;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pub_pathimu;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_points_msckf, pub_points_slam, pub_points_aruco, pub_points_sim;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_loop_pose, pub_loop_extrinsic;

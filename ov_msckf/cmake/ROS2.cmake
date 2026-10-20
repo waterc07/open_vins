@@ -112,5 +112,18 @@ install(TARGETS test_sim_repeat DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
 install(DIRECTORY ../config/ DESTINATION share/${PROJECT_NAME}/config/)
 
+if(BUILD_TESTING)
+    add_executable(test_visual_update_status test/test_visual_update_status.cpp)
+    target_compile_options(test_visual_update_status PRIVATE -UNDEBUG)
+    add_test(NAME visual_update_status COMMAND test_visual_update_status)
+
+    add_executable(test_imu_coverage test/test_imu_coverage.cpp)
+    ament_target_dependencies(test_imu_coverage ${ament_libraries})
+    target_link_libraries(test_imu_coverage ov_msckf_lib ${thirdparty_libraries})
+    foreach(case missing_start missing_end selection recovery zupt)
+        add_test(NAME imu_coverage_${case} COMMAND test_imu_coverage ${case})
+    endforeach()
+endif()
+
 # finally define this as the package
 ament_package()

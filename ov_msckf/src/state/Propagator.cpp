@@ -67,6 +67,10 @@ void Propagator::propagate_and_clone(std::shared_ptr<State> state, double timest
     std::lock_guard<std::mutex> lck(imu_data_mtx);
     prop_data = Propagator::select_imu_readings(imu_data, time0, time1);
   }
+  if (prop_data.size() < 2) {
+    PRINT_WARNING(YELLOW "[PROP]: IMU interval not covered; state and clone unchanged.\n" RESET);
+    return;
+  }
 
   // We are going to sum up all the state transition matrices, so we can do a single large multiplication at the end
   // Phi_summed = Phi_i*Phi_summed
@@ -279,6 +283,14 @@ std::vector<ov_core::ImuData> Propagator::select_imu_readings(const std::vector<
     return prop_data;
   }
 
+  if (imu_data.size() < 2 || !std::isfinite(time0) || !std::isfinite(time1) || time1 <= time0 ||
+      imu_data.front().timestamp > time0 || imu_data.back().timestamp < time1) {
+    if (warn)
+      PRINT_WARNING(YELLOW "[IMU]: requested interval [%.9f, %.9f] not covered by [%.9f, %.9f]; rejecting.\n" RESET,
+                    time0, time1, imu_data.front().timestamp, imu_data.back().timestamp);
+    return {};
+  }
+
   // Loop through and find all the needed measurements to propagate with
   // Note we split measurements based on the given state time, and the update timestamp
   for (size_t i = 0; i < imu_data.size() - 1; i++) {
@@ -351,18 +363,14 @@ std::vector<ov_core::ImuData> Propagator::select_imu_readings(const std::vector<
     return prop_data;
   }
 
-  // If we did not reach the whole integration period
-  // (i.e., the last inertial measurement we have is smaller then the time we want to reach)
-  // Then we should just "stretch" the last measurement to be the whole period
-  // TODO: this really isn't that good of logic, we should fix this so the above logic is exact!
-  if (prop_data.at(prop_data.size() - 1).timestamp != time1) {
+  // 区间终点恰好等于最后一条真实采样时补入该采样，不外推。
+  if (prop_data.back().timestamp != time1 && imu_data.back().timestamp == time1)
+    prop_data.push_back(imu_data.back());
+
+  if (prop_data.front().timestamp != time0 || prop_data.back().timestamp != time1) {
     if (warn)
-      PRINT_DEBUG(YELLOW "Propagator::select_imu_readings(): Missing inertial measurements to propagate with (%f sec missing)!\n" RESET,
-                  (time1 - imu_data.at(imu_data.size() - 1).timestamp));
-    ov_core::ImuData data = interpolate_data(imu_data.at(imu_data.size() - 2), imu_data.at(imu_data.size() - 1), time1);
-    prop_data.push_back(data);
-    // PRINT_DEBUG("propagation #%d = CASE 3.4 = %.3f => %.3f\n", (int)(imu_data.size() - 2), data.timestamp - prop_data.at(0).timestamp,
-    // data.timestamp - time0);
+      PRINT_WARNING(YELLOW "[IMU]: selected interval does not cover requested bounds; rejecting.\n" RESET);
+    return {};
   }
 
   // Loop through and ensure we do not have any zero dt values

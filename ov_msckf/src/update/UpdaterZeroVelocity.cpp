@@ -96,15 +96,14 @@ bool UpdaterZeroVelocity::try_update(std::shared_ptr<State> state, double timest
   // Select bounding inertial measurements
   std::vector<ov_core::ImuData> imu_recent = Propagator::select_imu_readings(imu_data, time0, time1);
 
-  // Move forward in time
-  last_prop_time_offset = t_off_new;
-
   // Check that we have at least one measurement to propagate with
   if (imu_recent.size() < 2) {
     PRINT_WARNING(RED "[ZUPT]: There are no IMU data to check for zero velocity with!!\n" RESET);
     last_zupt_state_timestamp = 0.0;
+    last_zupt_count = 0;
     return false;
   }
+  last_prop_time_offset = t_off_new;
 
   // If we should integrate the acceleration and say the velocity should be zero
   // Also if we should still inflate the bias based on their random walk noises
@@ -282,6 +281,11 @@ bool UpdaterZeroVelocity::try_update(std::shared_ptr<State> state, double timest
     double time0_cam = last_zupt_state_timestamp;
     double time1_cam = timestamp;
     _prop->propagate_and_clone(state, time1_cam);
+    if (state->_timestamp != time1_cam) {
+      last_zupt_state_timestamp = 0.0;
+      last_zupt_count = 0;
+      return false;
+    }
 
     // Create the update system!
     H = Eigen::MatrixXd::Zero(9, 15);

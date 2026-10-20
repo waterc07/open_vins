@@ -32,6 +32,7 @@
 #include <string>
 
 #include "VioManagerOptions.h"
+#include "visual_update_status.h"
 
 namespace ov_core {
 struct ImuData;
@@ -95,8 +96,13 @@ public:
    */
   void initialize_with_gt(Eigen::Matrix<double, 17, 1> imustate);
 
-  /// If we are initialized or not
+  /// Legacy flag: initialized state with at least one ordinary propagation/update.
   bool initialized() { return is_initialized_vio && timelastupdate != -1; }
+
+  bool state_initialized() const { return is_initialized_vio; }
+  bool zero_velocity_update_active() const { return did_zupt_update; }
+  const VisualUpdateStatus &visual_updates() const { return visual_update_status; }
+
 
   /// Timestamp that the system was initialized at
   double initialized_time() { return startup_time; }
@@ -195,7 +201,8 @@ protected:
   std::shared_ptr<ov_init::InertialInitializer> initializer;
 
   /// Boolean if we are initialized or not
-  bool is_initialized_vio = false;
+  std::atomic<bool> is_initialized_vio{false};
+  VisualUpdateStatus visual_update_status;
 
   /// Our MSCKF feature updater
   std::shared_ptr<UpdaterMSCKF> updaterMSCKF;
@@ -226,7 +233,7 @@ protected:
   std::atomic<bool> thread_init_running, thread_init_success;
 
   // If we did a zero velocity update
-  bool did_zupt_update = false;
+  std::atomic<bool> did_zupt_update{false};
   bool has_moved_since_zupt = false;
 
   // Good features that where used in the last update (used in visualization)

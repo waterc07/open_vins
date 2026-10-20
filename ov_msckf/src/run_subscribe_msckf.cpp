@@ -74,8 +74,8 @@ int main(int argc, char **argv) {
   options.automatically_declare_parameters_from_overrides(true);
   auto node = std::make_shared<rclcpp::Node>("run_subscribe_msckf", options);
   node->get_parameter<std::string>("config_path", config_path);
-  bool graceful_shutdown = false;
-  node->get_parameter_or<bool>("graceful_shutdown", graceful_shutdown, false);
+  bool graceful_shutdown = true;
+  node->get_parameter_or<bool>("graceful_shutdown", graceful_shutdown, true);
   if (graceful_shutdown) {
     rclcpp::uninstall_signal_handlers();
     std::signal(SIGINT, request_stop);
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   params.print_and_load(parser);
   params.use_multi_threading_subs = true;
 #if ROS_AVAILABLE == 2
-  // 可选回放模式：在线程退出后释放发布者，再关闭 ROS context。
+  // 先结束同步回调并释放发布者，再关闭 ROS context。
   if (graceful_shutdown) {
     params.use_multi_threading_subs = false;
     params.use_multi_threading_pubs = false;

@@ -100,7 +100,7 @@ public:
    *
    * This will first collect all imu readings that occured between the
    * *current* state time and the new time we want the state to be at.
-   * If we don't have any imu readings we will try to extrapolate into the future.
+   * IMU 未覆盖完整区间时保留状态，不向区间外推。
    * After propagating the mean and covariance using our dynamics,
    * We clone the current imu pose as a new clone in our state.
    *
@@ -136,7 +136,7 @@ public:
    * @param time0 Start timestamp
    * @param time1 End timestamp
    * @param warn If we should warn if we don't have enough IMU to propagate with (e.g. fast prop will get warnings otherwise)
-   * @return Vector of measurements (if we could compute them)
+   * @return 完整覆盖区间的测量；缺少边界时返回空，不外推。
    */
   static std::vector<ov_core::ImuData> select_imu_readings(const std::vector<ov_core::ImuData> &imu_data, double time0, double time1,
                                                            bool warn = true);
