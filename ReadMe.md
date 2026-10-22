@@ -190,7 +190,7 @@ You must preserve the copyright and license notices in your derivative work and 
 
 ## 项目 ROS 2 回放退出模式
 
-`run_subscribe_msckf` 的 `graceful_shutdown` 参数默认 false。Gazebo 离线回放显式设置 true：
+`run_subscribe_msckf` 的 `graceful_shutdown` 参数默认 true；Gazebo 离线回放也显式设置 true：
 
 ```bash
 ros2 run ov_msckf run_subscribe_msckf /absolute/path/estimator_config.yaml \
@@ -199,4 +199,4 @@ ros2 run ov_msckf run_subscribe_msckf /absolute/path/estimator_config.yaml \
 
 启用后使用同步图像回调和同步可视化发布，SIGINT/SIGTERM 只设置退出标志。主循环退出后先执行最终可视化、释放 visualizer 和 VioManager，再关闭 ROS context，避免发布器晚于 context 销毁。
 
-此模式用于有界离线回放，不替换默认在线多线程行为，也不构成 Pi 实时性或真实 VIO 验收。
+显式设置 false 才使用原异步图像处理路径，其退出行为尚未验收。同步处理也不构成 Pi 实时性、共载预算或真实 VIO 质量验收。
