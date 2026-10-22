@@ -64,23 +64,26 @@ ament_export_libraries(ov_init_lib)
 # Make binary files!
 ##################################################
 
-add_executable(test_simulation src/test_simulation.cpp)
-ament_target_dependencies(test_simulation ${ament_libraries})
-target_link_libraries(test_simulation ov_init_lib ${thirdparty_libraries})
-install(TARGETS test_simulation DESTINATION lib/${PROJECT_NAME})
+option(BB_BUILD_OPENVINS_TOOLS "Build OpenVINS simulation and diagnostic executables" ON)
+if(BB_BUILD_OPENVINS_TOOLS)
+  add_executable(test_simulation src/test_simulation.cpp)
+  ament_target_dependencies(test_simulation ${ament_libraries})
+  target_link_libraries(test_simulation ov_init_lib ${thirdparty_libraries})
+  install(TARGETS test_simulation DESTINATION lib/${PROJECT_NAME})
 
-add_executable(test_dynamic_mle src/test_dynamic_mle.cpp)
-ament_target_dependencies(test_dynamic_mle ${ament_libraries})
-target_link_libraries(test_dynamic_mle ov_init_lib ${thirdparty_libraries})
-install(TARGETS test_dynamic_mle DESTINATION lib/${PROJECT_NAME})
+  add_executable(test_dynamic_mle src/test_dynamic_mle.cpp)
+  ament_target_dependencies(test_dynamic_mle ${ament_libraries})
+  target_link_libraries(test_dynamic_mle ov_init_lib ${thirdparty_libraries})
+  install(TARGETS test_dynamic_mle DESTINATION lib/${PROJECT_NAME})
 
-add_executable(test_dynamic_init src/test_dynamic_init.cpp)
-ament_target_dependencies(test_dynamic_init ${ament_libraries})
-target_link_libraries(test_dynamic_init ov_init_lib ${thirdparty_libraries})
-install(TARGETS test_dynamic_init DESTINATION lib/${PROJECT_NAME})
+  add_executable(test_dynamic_init src/test_dynamic_init.cpp)
+  ament_target_dependencies(test_dynamic_init ${ament_libraries})
+  target_link_libraries(test_dynamic_init ov_init_lib ${thirdparty_libraries})
+  install(TARGETS test_dynamic_init DESTINATION lib/${PROJECT_NAME})
 
-# Install launch and config directories
-install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
+  # Install launch and config directories
+  install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
+endif()
 
 # finally define this as the package
 ament_package()
