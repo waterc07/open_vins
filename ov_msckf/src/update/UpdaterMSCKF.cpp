@@ -55,7 +55,12 @@ UpdaterMSCKF::UpdaterMSCKF(UpdaterOptions &options, ov_core::FeatureInitializerO
   }
 }
 
-void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_ptr<Feature>> &feature_vec) {
+void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_ptr<Feature>> &feature_vec,
+                          MsckfUpdateDiagnostics *diagnostics) {
+  MsckfUpdateDiagnostics ignored;
+  auto &counts = diagnostics ? *diagnostics : ignored;
+  counts = {};
+  counts.candidates = feature_vec.size();
 
   // Return if no features
   if (feature_vec.empty())
@@ -86,6 +91,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
 
     // Remove if we don't have enough
     if (ct_meas < 2) {
+      ++counts.rejected_short_track;
       (*it0)->to_delete = true;
       it0 = feature_vec.erase(it0);
     } else {
@@ -134,6 +140,8 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
 
     // Remove the feature if not a success
     if (!success_tri || !success_refine) {
+      if (!success_tri) ++counts.rejected_triangulation;
+      else ++counts.rejected_refinement;
       (*it1)->to_delete = true;
       it1 = feature_vec.erase(it1);
       continue;
@@ -223,6 +231,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
 
     // Check if we should delete or not
     if (chi2 > _options.chi2_multipler * chi2_check) {
+      ++counts.rejected_chi2;
       (*it2)->to_delete = true;
       it2 = feature_vec.erase(it2);
       // PRINT_DEBUG("featid = %d\n", feat.featid);
@@ -233,6 +242,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
       continue;
     }
 
+    ++counts.accepted_constraints;
     // We are good!!! Append to our large H vector
     size_t ct_hx = 0;
     for (const auto &var : Hx_order) {
@@ -283,6 +293,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
 
   // 6. With all good features update the state
   StateHelper::EKFUpdate(state, Hx_order_big, Hx_big, res_big, R_big);
+  counts.state_update_applied = true;
   rT5 = boost::posix_time::microsec_clock::local_time();
 
   // Debug print timing information

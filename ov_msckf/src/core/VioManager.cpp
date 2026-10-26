@@ -20,6 +20,7 @@
  */
 
 #include "VioManager.h"
+#include <set>
 
 #include "feat/Feature.h"
 #include "feat/FeatureDatabase.h"
@@ -254,6 +255,8 @@ void VioManager::feed_measurement_simulation(double timestamp, const std::vector
 }
 
 void VioManager::track_image_and_update(const ov_core::CameraData &message_const) {
+  const bool capture_diagnostics = camera_diagnostics_enabled.load();
+  CameraDiagnosticsScope capture(capture_diagnostics ? &camera_diagnostics : nullptr, message_const.timestamp);
 
   // Start timing
   rT1 = boost::posix_time::microsec_clock::local_time();
@@ -279,6 +282,18 @@ void VioManager::track_image_and_update(const ov_core::CameraData &message_const
 
   // Perform our feature tracking!
   trackFEATS->feed_new_camera(message);
+  if (capture_diagnostics) {
+    std::set<size_t> unique_ids;
+    const auto observations = trackFEATS->get_last_ids();
+    for (const auto camera : message.sensor_ids) {
+      const auto found = observations.find(camera);
+      if (found == observations.end()) continue;
+      capture.frame.tracked_per_camera[camera] = found->second.size();
+      unique_ids.insert(found->second.begin(), found->second.end());
+    }
+    capture.frame.tracked_unique_ids = unique_ids.size();
+    capture.frame.stage = "initializing";
+  }
 
   // If the aruco tracker is available, the also pass to it
   // NOTE: binocular tracking for aruco doesn't make sense as we by default have the ids
@@ -297,6 +312,7 @@ void VioManager::track_image_and_update(const ov_core::CameraData &message_const
       did_zupt_update = updaterZUPT->try_update(state, message.timestamp);
     }
     if (did_zupt_update) {
+      capture.frame.stage = "zupt";
       assert(state->_timestamp == message.timestamp);
       propagator->clean_old_imu_measurements(message.timestamp + state->_calib_dt_CAMtoIMU->value()(0) - 0.10);
       updaterZUPT->clean_old_imu_measurements(message.timestamp + state->_calib_dt_CAMtoIMU->value()(0) - 0.10);
@@ -319,10 +335,10 @@ void VioManager::track_image_and_update(const ov_core::CameraData &message_const
   }
 
   // Call on our propagate and update function
-  do_feature_propagate_update(message);
+  do_feature_propagate_update(message, capture_diagnostics ? &capture.frame : nullptr);
 }
 
-void VioManager::do_feature_propagate_update(const ov_core::CameraData &message) {
+void VioManager::do_feature_propagate_update(const ov_core::CameraData &message, CameraUpdateDiagnostics *diagnostics) {
 
   //===================================================================================
   // State propagation, and clone augmentation
@@ -330,6 +346,7 @@ void VioManager::do_feature_propagate_update(const ov_core::CameraData &message)
 
   // Return if the camera measurement is out of order
   if (state->_timestamp > message.timestamp) {
+    if (diagnostics) diagnostics->stage = "out_of_order";
     PRINT_WARNING(YELLOW "image received out of order, unable to do anything (prop dt = %3f)\n" RESET,
                   (message.timestamp - state->_timestamp));
     return;
@@ -348,6 +365,7 @@ void VioManager::do_feature_propagate_update(const ov_core::CameraData &message)
   // This isn't super ideal, but it keeps the logic after this easier...
   // We can start processing things when we have at least 5 clones since we can start triangulating things...
   if ((int)state->_clones_IMU.size() < std::min(state->_options.max_clone_size, 5)) {
+    if (diagnostics) diagnostics->stage = "waiting_clones";
     PRINT_DEBUG("waiting for enough clone states (%d of %d)....\n", (int)state->_clones_IMU.size(),
                 std::min(state->_options.max_clone_size, 5));
     return;
@@ -355,6 +373,7 @@ void VioManager::do_feature_propagate_update(const ov_core::CameraData &message)
 
   // Return if we where unable to propagate
   if (state->_timestamp != message.timestamp) {
+    if (diagnostics) diagnostics->stage = "propagation_failed";
     PRINT_WARNING(RED "[PROP]: Propagator unable to propagate the state forward in time!\n" RESET);
     PRINT_WARNING(RED "[PROP]: It has been %.3f since last time we propagated\n" RESET, message.timestamp - state->_timestamp);
     return;
@@ -524,7 +543,8 @@ void VioManager::do_feature_propagate_update(const ov_core::CameraData &message)
   // NOTE: this should only really be used if you want to track a lot of features, or have limited computational resources
   if ((int)featsup_MSCKF.size() > state->_options.max_msckf_in_update)
     featsup_MSCKF.erase(featsup_MSCKF.begin(), featsup_MSCKF.end() - state->_options.max_msckf_in_update);
-  updaterMSCKF->update(state, featsup_MSCKF);
+  updaterMSCKF->update(state, featsup_MSCKF, diagnostics ? &diagnostics->msckf : nullptr);
+  if (diagnostics) diagnostics->stage = "update_complete";
   propagator->invalidate_cache();
   rT4 = boost::posix_time::microsec_clock::local_time();
 

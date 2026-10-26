@@ -4,6 +4,10 @@
 > tracked. Obtain removed reference tables from the upstream OpenVINS repository
 > if running its original benchmark/evaluation examples.
 
+## Boom_Birds camera diagnostics
+
+ROS 2 parameter `camera_diagnostics` defaults to false. When enabled, `status.camera_diagnostics` reports completed-frame track counts and MSCKF rejection/applied-update counts. This does not change navigation freshness gates. Counts describe MSCKF only; current tracks and previously accepted visual features are separate fields. Rebuild the executable and `libov_msckf_lib.so` together and verify the loaded library path.
+
 # OpenVINS
 
 [![ROS 1 Workflow](https://github.com/rpng/open_vins/actions/workflows/build_ros1.yml/badge.svg)](https://github.com/rpng/open_vins/actions/workflows/build_ros1.yml)

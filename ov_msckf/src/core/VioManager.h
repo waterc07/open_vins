@@ -33,6 +33,7 @@
 
 #include "VioManagerOptions.h"
 #include "visual_update_status.h"
+#include "camera_update_diagnostics.h"
 
 namespace ov_core {
 struct ImuData;
@@ -102,6 +103,9 @@ public:
   bool state_initialized() const { return is_initialized_vio; }
   bool zero_velocity_update_active() const { return did_zupt_update; }
   const VisualUpdateStatus &visual_updates() const { return visual_update_status; }
+  void enable_camera_diagnostics(bool enabled) { camera_diagnostics_enabled.store(enabled); }
+  bool camera_diagnostics_active() const { return camera_diagnostics_enabled.load(); }
+  std::string camera_diagnostics_json() const { return camera_diagnostics.json(); }
 
 
   /// Timestamp that the system was initialized at
@@ -157,7 +161,8 @@ protected:
    * @brief This will do the propagation and feature updates to the state
    * @param message Contains our timestamp, images, and camera ids
    */
-  void do_feature_propagate_update(const ov_core::CameraData &message);
+  void do_feature_propagate_update(const ov_core::CameraData &message,
+                                   CameraUpdateDiagnostics *diagnostics = nullptr);
 
   /**
    * @brief This function will try to initialize the state.
@@ -184,6 +189,8 @@ protected:
 
   /// Manager parameters
   VioManagerOptions params;
+  std::atomic<bool> camera_diagnostics_enabled{false};
+  CameraDiagnosticsStore camera_diagnostics;
 
   /// Our master state object :D
   std::shared_ptr<State> state;

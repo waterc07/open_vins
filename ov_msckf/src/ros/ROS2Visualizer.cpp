@@ -56,6 +56,12 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   if (!std::isfinite(visual_update_timeout_s) || visual_update_timeout_s <= 0)
     throw std::invalid_argument("visual_update_timeout_s must be positive and finite");
 
+  bool camera_diagnostics = false;
+  if (!node->has_parameter("camera_diagnostics"))
+    node->declare_parameter<bool>("camera_diagnostics", false);
+  node->get_parameter("camera_diagnostics", camera_diagnostics);
+  _app->enable_camera_diagnostics(camera_diagnostics);
+
   // Setup our transform broadcaster
   mTfBr = std::make_shared<tf2_ros::TransformBroadcaster>(node);
 
@@ -648,6 +654,8 @@ void ROS2Visualizer::publish_status(double timestamp_in_imu) {
     json << updates.timestamp();
   else
     json << "null";
+  if (_app->camera_diagnostics_active())
+    json << ",\"camera_diagnostics\":" << _app->camera_diagnostics_json();
   json << "}";
   std_msgs::msg::String message;
   message.data = json.str();

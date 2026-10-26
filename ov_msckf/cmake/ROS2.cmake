@@ -122,6 +122,18 @@ if(BUILD_TESTING)
     target_compile_options(test_visual_update_status PRIVATE -UNDEBUG)
     add_test(NAME visual_update_status COMMAND test_visual_update_status)
 
+    add_executable(test_camera_status test/test_camera_status.cpp)
+    target_compile_options(test_camera_status PRIVATE -UNDEBUG)
+    ament_target_dependencies(test_camera_status ${ament_libraries})
+    target_link_libraries(test_camera_status ov_msckf_lib ${thirdparty_libraries})
+    add_test(NAME camera_status_intra_process COMMAND test_camera_status ${CMAKE_CURRENT_SOURCE_DIR}/../config/euroc_mav/estimator_config.yaml)
+
+    add_executable(test_camera_diagnostics test/test_camera_diagnostics.cpp)
+    target_compile_options(test_camera_diagnostics PRIVATE -UNDEBUG)
+    ament_target_dependencies(test_camera_diagnostics ${ament_libraries})
+    target_link_libraries(test_camera_diagnostics ov_msckf_lib ${thirdparty_libraries})
+    add_test(NAME camera_diagnostics COMMAND test_camera_diagnostics)
+
     add_executable(test_imu_coverage test/test_imu_coverage.cpp)
     ament_target_dependencies(test_imu_coverage ${ament_libraries})
     target_link_libraries(test_imu_coverage ov_msckf_lib ${thirdparty_libraries})

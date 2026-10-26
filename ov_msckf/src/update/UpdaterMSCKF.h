@@ -28,6 +28,7 @@
 #include "feat/FeatureInitializerOptions.h"
 
 #include "UpdaterOptions.h"
+#include "core/camera_update_diagnostics.h"
 
 namespace ov_core {
 class Feature;
@@ -65,7 +66,8 @@ public:
    * @param state State of the filter
    * @param feature_vec Features that can be used for update
    */
-  void update(std::shared_ptr<State> state, std::vector<std::shared_ptr<ov_core::Feature>> &feature_vec);
+  void update(std::shared_ptr<State> state, std::vector<std::shared_ptr<ov_core::Feature>> &feature_vec,
+              MsckfUpdateDiagnostics *diagnostics = nullptr);
 
 protected:
   /// Options used during update
