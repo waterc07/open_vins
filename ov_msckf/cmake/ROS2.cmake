@@ -118,6 +118,10 @@ if(BB_BUILD_OPENVINS_TOOLS)
 endif()
 
 if(BUILD_TESTING)
+    add_executable(test_camera_rate_gate test/test_camera_rate_gate.cpp)
+    target_compile_options(test_camera_rate_gate PRIVATE -UNDEBUG)
+    add_test(NAME camera_rate_gate COMMAND test_camera_rate_gate)
+
     add_executable(test_visual_update_status test/test_visual_update_status.cpp)
     target_compile_options(test_visual_update_status PRIVATE -UNDEBUG)
     add_test(NAME visual_update_status COMMAND test_visual_update_status)

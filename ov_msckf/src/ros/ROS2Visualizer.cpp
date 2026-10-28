@@ -20,6 +20,7 @@
  */
 
 #include "ROS2Visualizer.h"
+#include "camera_rate_gate.h"
 #include "bounded_camera_queue.h"
 #include <cmath>
 #include <stdexcept>
@@ -529,8 +530,9 @@ void ROS2Visualizer::callback_monocular(const sensor_msgs::msg::Image::SharedPtr
 
   // Check if we should drop this image
   double timestamp = msg0->header.stamp.sec + msg0->header.stamp.nanosec * 1e-9;
-  double time_delta = 1.0 / _app->get_params().track_frequency;
-  if (camera_last_timestamp.find(cam_id0) != camera_last_timestamp.end() && timestamp < camera_last_timestamp.at(cam_id0) + time_delta) {
+  const auto previous = camera_last_timestamp.find(cam_id0);
+  if (!accept_camera_timestamp(timestamp, previous == camera_last_timestamp.end()
+      ? -INFINITY : previous->second, _app->get_params().track_frequency)) {
     return;
   }
   camera_last_timestamp[cam_id0] = timestamp;
@@ -575,8 +577,9 @@ void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedP
 
   // Check if we should drop this image
   double timestamp = msg0->header.stamp.sec + msg0->header.stamp.nanosec * 1e-9;
-  double time_delta = 1.0 / _app->get_params().track_frequency;
-  if (camera_last_timestamp.find(cam_id0) != camera_last_timestamp.end() && timestamp < camera_last_timestamp.at(cam_id0) + time_delta) {
+  const auto previous = camera_last_timestamp.find(cam_id0);
+  if (!accept_camera_timestamp(timestamp, previous == camera_last_timestamp.end()
+      ? -INFINITY : previous->second, _app->get_params().track_frequency)) {
     return;
   }
   camera_last_timestamp[cam_id0] = timestamp;

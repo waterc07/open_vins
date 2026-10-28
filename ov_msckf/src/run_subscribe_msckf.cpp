@@ -99,7 +99,9 @@ int main(int argc, char **argv) {
   // Create our VIO system
   VioManagerOptions params;
   params.print_and_load(parser);
+#if ROS_AVAILABLE == 1
   params.use_multi_threading_subs = true;
+#endif
 #if ROS_AVAILABLE == 2
   // 先结束同步回调并释放发布者，再关闭 ROS context。
   if (graceful_shutdown) {

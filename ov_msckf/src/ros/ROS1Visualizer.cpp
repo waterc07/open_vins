@@ -20,6 +20,7 @@
  */
 
 #include "ROS1Visualizer.h"
+#include "camera_rate_gate.h"
 
 #include "core/VioManager.h"
 #include "ros/ROSVisualizerHelper.h"
@@ -499,8 +500,9 @@ void ROS1Visualizer::callback_monocular(const sensor_msgs::ImageConstPtr &msg0, 
 
   // Check if we should drop this image
   double timestamp = msg0->header.stamp.toSec();
-  double time_delta = 1.0 / _app->get_params().track_frequency;
-  if (camera_last_timestamp.find(cam_id0) != camera_last_timestamp.end() && timestamp < camera_last_timestamp.at(cam_id0) + time_delta) {
+  const auto previous = camera_last_timestamp.find(cam_id0);
+  if (!accept_camera_timestamp(timestamp, previous == camera_last_timestamp.end()
+      ? -INFINITY : previous->second, _app->get_params().track_frequency)) {
     return;
   }
   camera_last_timestamp[cam_id0] = timestamp;
@@ -539,8 +541,9 @@ void ROS1Visualizer::callback_stereo(const sensor_msgs::ImageConstPtr &msg0, con
 
   // Check if we should drop this image
   double timestamp = msg0->header.stamp.toSec();
-  double time_delta = 1.0 / _app->get_params().track_frequency;
-  if (camera_last_timestamp.find(cam_id0) != camera_last_timestamp.end() && timestamp < camera_last_timestamp.at(cam_id0) + time_delta) {
+  const auto previous = camera_last_timestamp.find(cam_id0);
+  if (!accept_camera_timestamp(timestamp, previous == camera_last_timestamp.end()
+      ? -INFINITY : previous->second, _app->get_params().track_frequency)) {
     return;
   }
   camera_last_timestamp[cam_id0] = timestamp;
