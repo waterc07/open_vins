@@ -91,6 +91,15 @@ bool VioManager::try_to_initialize(const ov_core::CameraData &message) {
     return true;
   }
 
+  // Static cold start needs a complete window before committing the initialized state.
+  if (!params.init_wait_for_motion) {
+    const double end = message.timestamp + state->_calib_dt_CAMtoIMU->value()(0);
+    if (!propagator->has_imu_coverage(end - params.init_options.init_window_time, end)) {
+      PRINT_DEBUG(YELLOW "[init]: waiting for continuous IMU window\n" RESET);
+      return false;
+    }
+  }
+
   // Run the initialization in a second thread so it can go as slow as it desires
   thread_init_running = true;
   std::thread thread([&] {

@@ -73,6 +73,12 @@ public:
     clean_old_imu_measurements(oldest_time - 0.10);
   }
 
+  /// Check the buffered interval with the same bounds and gap rules as propagation.
+  bool has_imu_coverage(double time0, double time1) {
+    std::lock_guard<std::mutex> lck(imu_data_mtx);
+    return select_imu_readings(imu_data, time0, time1, false).size() >= 2;
+  }
+
   /**
    * @brief This will remove any IMU measurements that are older then the given measurement time
    * @param oldest_time Time that we can discard measurements before (in IMU clock)

@@ -81,6 +81,12 @@ int main(int argc, char **argv) {
       require(Propagator::select_imu_readings({sample(100.),sample(106.82)},100.01,106.8,false).empty(),
               "live 6.82 second gap accepted");
       for (const auto &x : data) prop->feed_imu(x);
+      require(!prop->has_imu_coverage(100.,100.22), "initialization coverage crossed gap");
+      require(prop->has_imu_coverage(100.,100.04), "initialization coverage rejected clean interval");
+      require(!prop->has_imu_coverage(99.98,100.04), "initialization coverage accepted missing start");
+      require(!prop->has_imu_coverage(100.,100.24), "initialization coverage accepted missing end");
+      for (int i=12;i<=112;++i) prop->feed_imu(sample(100.+.02*i));
+      require(prop->has_imu_coverage(100.24,102.24), "initialization window did not recover after gap");
       prop->propagate_and_clone(state,100.22);
       unchanged(state,imu,cov);
       Eigen::Matrix<double,13,1> prediction;
