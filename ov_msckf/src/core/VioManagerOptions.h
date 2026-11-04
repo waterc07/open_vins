@@ -396,6 +396,9 @@ struct VioManagerOptions {
   /// If we should process two cameras are being stereo or binocular. If binocular, we do monocular feature tracking on each image.
   bool use_stereo = true;
 
+  // Optional calibrated check of stereo tracks after temporal matching.
+  bool stereoGeometryCheck = false;
+
   /// If we should use KLT tracking, or descriptor matcher
   bool use_klt = true;
 
@@ -453,6 +456,7 @@ struct VioManagerOptions {
   void print_and_load_trackers(const std::shared_ptr<ov_core::YamlParser> &parser = nullptr) {
     if (parser != nullptr) {
       parser->parse_config("use_stereo", use_stereo);
+      parser->parse_config("stereo_geometry_check", stereoGeometryCheck, false);
       parser->parse_config("use_klt", use_klt);
       parser->parse_config("use_aruco", use_aruco);
       parser->parse_config("downsize_aruco", downsize_aruco);
@@ -485,6 +489,7 @@ struct VioManagerOptions {
     }
     PRINT_DEBUG("FEATURE TRACKING PARAMETERS:\n");
     PRINT_DEBUG("  - use_stereo: %d\n", use_stereo);
+    PRINT_DEBUG("  - stereo_geometry_check: %d\n", stereoGeometryCheck);
     PRINT_DEBUG("  - use_klt: %d\n", use_klt);
     PRINT_DEBUG("  - use_aruco: %d\n", use_aruco);
     PRINT_DEBUG("  - downsize aruco: %d\n", downsize_aruco);

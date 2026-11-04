@@ -23,6 +23,7 @@
 #define OV_CORE_TRACK_KLT_H
 
 #include "TrackBase.h"
+#include "StereoEpipolarGate.h"
 
 namespace ov_core {
 
@@ -62,7 +63,17 @@ public:
    */
   void feed_new_camera(const CameraData &message) override;
 
+  void configureStereoGeometry(size_t left, size_t right, const Eigen::Matrix3d &rotation, const Eigen::Vector3d &translation) {
+    stereoLeft = left;
+    stereoRight = right;
+    stereoGeometry.reset(new StereoEpipolarGate(camera_calib.at(left),camera_calib.at(right),rotation,translation));
+  }
+
+
 protected:
+  std::unique_ptr<StereoEpipolarGate> stereoGeometry;
+  size_t stereoLeft=0, stereoRight=1;
+
   /**
    * @brief Process a new monocular image
    * @param message Contains our timestamp, images, and camera ids

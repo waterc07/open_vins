@@ -479,12 +479,12 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
   visualize_odometry(message.timestamp);
 
   // If the processing queue is currently active / running just return so we can keep getting measurements
-  // Otherwise create a second thread to do our update in an async manor
+  // Otherwise process the queue here or dispatch an asynchronous update.
   // The visualization of the state, images, and features will be synchronous with the update!
   if (thread_update_running)
     return;
   thread_update_running = true;
-  std::thread thread([&] {
+  auto update = [this, timestamp_imu = message.timestamp] {
     // Lock on the queue (prevents new images from appending)
     std::lock_guard<std::mutex> lck(camera_queue_mtx);
 
@@ -502,7 +502,7 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
 
       // Loop through our queue and see if we are able to process any of our camera measurements
       // We are able to process if we have at least one IMU measurement greater than the camera time
-      double timestamp_imu_inC = message.timestamp - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
+      double timestamp_imu_inC = timestamp_imu - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
       while (!camera_queue.empty() && camera_queue.at(0).timestamp < timestamp_imu_inC) {
         auto rT0_1 = boost::posix_time::microsec_clock::local_time();
         double update_dt = 1000.0 * (timestamp_imu_inC - camera_queue.at(0).timestamp);
@@ -515,14 +515,12 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
       }
     }
     thread_update_running = false;
-  });
+  };
 
-  // If we are single threaded, then run single threaded
-  // Otherwise detach this thread so it runs in the background!
   if (!_app->get_params().use_multi_threading_subs) {
-    thread.join();
+    update();
   } else {
-    thread.detach();
+    std::thread(update).detach();
   }
 }
 

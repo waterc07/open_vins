@@ -85,5 +85,14 @@ if(BB_BUILD_OPENVINS_TOOLS)
   install(TARGETS test_profile DESTINATION lib/${PROJECT_NAME})
 endif()
 
+if(BUILD_TESTING)
+  enable_testing()
+  add_executable(test_stereo_geometry test/test_stereo_geometry.cpp)
+  target_compile_options(test_stereo_geometry PRIVATE -UNDEBUG)
+  ament_target_dependencies(test_stereo_geometry rclcpp cv_bridge)
+  target_link_libraries(test_stereo_geometry ov_core_lib ${thirdparty_libraries})
+  add_test(NAME stereo_geometry COMMAND test_stereo_geometry)
+endif()
+
 # finally define this as the package
 ament_package()

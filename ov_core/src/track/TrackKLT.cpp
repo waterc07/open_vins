@@ -353,6 +353,12 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
     }
   }
 
+  if (stereoGeometry) {
+    if (cam_id_left!=stereoLeft || cam_id_right!=stereoRight)
+      throw std::invalid_argument("stereo_geometry_check camera order differs from configured extrinsics");
+    stereoGeometry->filter(good_left,good_right,good_ids_left,good_ids_right);
+  }
+
   // Update our feature database, with theses new observations
   for (size_t i = 0; i < good_left.size(); i++) {
     cv::Point2f npt_l = camera_calib.at(cam_id_left)->undistort_cv(good_left.at(i).pt);

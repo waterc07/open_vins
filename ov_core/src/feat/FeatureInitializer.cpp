@@ -94,9 +94,8 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   singularValues = svd.singularValues();
   double condA = singularValues(0, 0) / singularValues(singularValues.rows() - 1, 0);
 
-  // std::stringstream ss;
-  // ss << feat->featid << " - cond " << std::abs(condA) << " - z " << p_f(2, 0) << std::endl;
-  // PRINT_DEBUG(ss.str().c_str());
+  PRINT_DEBUG("[TRIANGULATION]: stamp=%.9f id=%zu cameras=%zu measurements=%d cond=%.9g depth=%.9g\n",
+              feat->anchor_clone_timestamp, feat->featid, feat->timestamps.size(), total_meas, std::abs(condA), p_f(2, 0));
 
   // If we have a bad condition number, or it is too close
   // Then set the flag for bad (i.e. set z-axis to nan)

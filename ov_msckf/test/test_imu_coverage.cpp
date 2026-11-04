@@ -58,11 +58,41 @@ int main(int argc, char **argv) {
         require(exact.size() == 3 && exact.front().timestamp == start && exact.back().timestamp == 100.04,
                 "last real sample incorrectly rejected");
       }
+      for (const auto &window : std::vector<std::pair<double,double>>{{100.025,100.035},{100.025,100.04}}) {
+        auto tail = Propagator::select_imu_readings(data,window.first,window.second);
+        require(tail.size() == 2 && tail.front().timestamp == window.first && tail.back().timestamp == window.second,
+                "covered interval inside final IMU pair rejected");
+      }
+      auto pair = Propagator::select_imu_readings({sample(100.),sample(100.02)},100.005,100.015);
+      require(pair.size() == 2 && pair.front().timestamp == 100.005 && pair.back().timestamp == 100.015,
+              "two-sample interpolation rejected");
       require(Propagator::select_imu_readings(data,99.99,100.03,false).empty(), "missing start accepted");
       require(Propagator::select_imu_readings(data,100.,100.05,false).empty(), "missing end extrapolated");
       require(Propagator::select_imu_readings({sample(100.)},100.,100.01,false).empty(), "single sample accepted");
       require(Propagator::select_imu_readings(data,100.03,100.01,false).empty(), "backward interval accepted");
       require(Propagator::select_imu_readings(data,100.,std::numeric_limits<double>::quiet_NaN(),false).empty(), "NaN interval accepted");
+    } else if (name == "internal_gap") {
+      const std::vector<ov_core::ImuData> data{sample(99.),sample(99.02),sample(100.),sample(100.02),
+                                            sample(100.04),sample(100.20),sample(100.22)};
+      require(Propagator::select_imu_readings(data,100.,100.22,false).empty(), "internal gap interpolated");
+      require(!Propagator::select_imu_readings(data,100.,100.04,false).empty(), "old gap outside interval rejected");
+      require(!Propagator::select_imu_readings({sample(100.),sample(100.1)},100.01,100.09,false).empty(),
+              "100 ms boundary rejected");
+      require(Propagator::select_imu_readings({sample(100.),sample(106.82)},100.01,106.8,false).empty(),
+              "live 6.82 second gap accepted");
+      for (const auto &x : data) prop->feed_imu(x);
+      prop->propagate_and_clone(state,100.22);
+      unchanged(state,imu,cov);
+      Eigen::Matrix<double,13,1> prediction;
+      Eigen::Matrix<double,12,12> prediction_cov;
+      require(!prop->fast_state_propagate(state,100.22,prediction,prediction_cov), "fast propagation crossed internal gap");
+      unchanged(state,imu,cov);
+      UpdaterOptions options;
+      auto db=std::make_shared<ov_core::FeatureDatabase>();
+      UpdaterZeroVelocity zupt(options,noise,db,prop,9.81,.1,10.,.5);
+      for (const auto &x : data) zupt.feed_imu(x);
+      require(!zupt.try_update(state,100.22), "ZUPT crossed internal gap");
+      unchanged(state,imu,cov);
     } else if (name == "recovery") {
       for (int i=0;i<=5;++i) prop->feed_imu(sample(100.+.02*i));
       prop->propagate_and_clone(state,100.12);

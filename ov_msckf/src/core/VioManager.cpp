@@ -20,6 +20,7 @@
  */
 
 #include "VioManager.h"
+#include <stdexcept>
 #include <set>
 
 #include "feat/Feature.h"
@@ -57,6 +58,10 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
 
   // Nice debug
   this->params = params_;
+  if (params.stereoGeometryCheck && (!params.use_stereo || !params.use_klt || params.state_options.num_cameras!=2 ||
+                                     params.state_options.do_calib_camera_pose))
+    throw std::invalid_argument("stereo_geometry_check requires two-camera stereo KLT with fixed extrinsics");
+
   params.print_and_load_estimator();
   params.print_and_load_noise();
   params.print_and_load_state();
@@ -138,6 +143,13 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
     trackFEATS = std::shared_ptr<TrackBase>(new TrackDescriptor(
         state->_cam_intrinsics_cameras, init_max_features, state->_options.max_aruco_features, params.use_stereo, params.histogram_method,
         params.fast_threshold, params.grid_x, params.grid_y, params.min_px_dist, params.knn_ratio));
+  }
+
+  if (params.stereoGeometryCheck) {
+    auto left=state->_calib_IMUtoCAM.at(0), right=state->_calib_IMUtoCAM.at(1);
+    Eigen::Matrix3d rotation=right->Rot()*left->Rot().transpose();
+    Eigen::Vector3d translation=right->pos()-rotation*left->pos();
+    std::static_pointer_cast<TrackKLT>(trackFEATS)->configureStereoGeometry(0,1,rotation,translation);
   }
 
   // Initialize our aruco tag extractor

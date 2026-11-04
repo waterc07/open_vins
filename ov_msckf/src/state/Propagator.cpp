@@ -291,6 +291,20 @@ std::vector<ov_core::ImuData> Propagator::select_imu_readings(const std::vector<
     return {};
   }
 
+  // 不跨越内部缺样；50 Hz 实机流中 100 ms 已覆盖五个采样周期。
+  constexpr double maxImuGapS = .1;
+  for (size_t i = 0; i + 1 < imu_data.size(); ++i) {
+    if (imu_data.at(i + 1).timestamp <= time0 || imu_data.at(i).timestamp >= time1)
+      continue;
+    const double gap = imu_data.at(i + 1).timestamp - imu_data.at(i).timestamp;
+    if (!std::isfinite(gap) || gap <= 0. || gap > maxImuGapS + 1e-6) {
+      if (warn)
+        PRINT_WARNING(YELLOW "[IMU]: internal sample gap %.9f s in [%.9f, %.9f]; rejecting.\n" RESET,
+                      gap, time0, time1);
+      return {};
+    }
+  }
+
   // Loop through and find all the needed measurements to propagate with
   // Note we split measurements based on the given state time, and the update timestamp
   for (size_t i = 0; i < imu_data.size() - 1; i++) {
@@ -302,6 +316,10 @@ std::vector<ov_core::ImuData> Propagator::select_imu_readings(const std::vector<
     if (imu_data.at(i + 1).timestamp > time0 && imu_data.at(i).timestamp < time0) {
       ov_core::ImuData data = Propagator::interpolate_data(imu_data.at(i), imu_data.at(i + 1), time0);
       prop_data.push_back(data);
+      if (imu_data.at(i + 1).timestamp >= time1) {
+        prop_data.push_back(Propagator::interpolate_data(imu_data.at(i), imu_data.at(i + 1), time1));
+        break;
+      }
       // PRINT_DEBUG("propagation #%d = CASE 1 = %.3f => %.3f\n", (int)i, data.timestamp - prop_data.at(0).timestamp,
       //             time0 - prop_data.at(0).timestamp);
       continue;

@@ -201,6 +201,25 @@ ros2 run ov_msckf run_subscribe_msckf /absolute/path/estimator_config.yaml \
   --ros-args -p graceful_shutdown:=true
 ```
 
-启用后使用同步图像回调和同步可视化发布，SIGINT/SIGTERM 只设置退出标志。主循环退出后先执行最终可视化、释放 visualizer 和 VioManager，再关闭 ROS context，避免发布器晚于 context 销毁。
+启用后使用同步图像回调和同步可视化发布，IMU 回调直接处理相机队列，不为每条 IMU 创建并等待工作线程。SIGINT/SIGTERM 只设置退出标志。主循环退出后先执行最终可视化、释放 visualizer 和 VioManager，再关闭 ROS context，避免发布器晚于 context 销毁。
 
 显式设置 false 才使用原异步图像处理路径，其退出行为尚未验收。同步处理也不构成 Pi 实时性、共载预算或真实 VIO 质量验收。
+
+## 三角化拒绝诊断
+
+`verbosity=DEBUG` 时，3D 线性三角化输出 `[TRIANGULATION]`：锚定时间、特征 ID、相机条目数、观测数、矩阵条件数和深度。日志不改变接受门限；常规 WARNING/INFO 不输出此行。相机条目数不是独立基线测量，须结合有效观测和克隆位姿判断几何。
+
+静止时，单相机短窗口轨迹可能因无足够时间基线而三角化失败。长期地标可复用先前完成的初始化，但更新仍须通过原几何、优化和卡方检查；项目 0.5 s 视觉新鲜度不由 ZUPT 或纯传播刷新。项目配置及现场验收状态由主仓库 bringup README／STATUS 维护。
+
+
+### Boom Birds：双目跟踪极线候选
+
+`stereo_geometry_check` 默认 false，可由估计器 YAML 或独立节点的 ROS 参数显式开启。仅支持固定外参的双目 KLT；在时间跟踪之后、写入特征数据库之前，用当前标定检查左右同 ID 观测，归一化极线距离按右目最大焦距换算，超过 2 px 时同时删除两目记录。未配对轨迹不变；沿极线方向的歧义、标定质量和单目误匹配仍由后续检查及验收处理。
+
+开启要求 `max_cameras=2`、`use_stereo=true`、`use_klt=true`、`calib_cam_extrinsics=false`，基线有限且非零；不满足时抛出配置错误。相机模型为 radtan／equidistant 的投影与过滤回归已覆盖。重建 ov_core、ov_init、ov_msckf；不要将新头文件与旧动态库混用。原特征预算、三角化／卡方／视觉新鲜度门限及默认 launch 不变，Pi 未部署。
+
+原生几何测试位于 ov_core/test/test_stereo_geometry.cpp，配置拒绝测试位于 ov_msckf/test/test_stereo_geometry_options.cpp。真实录包、ROS 输送、默认／部署与验收范围见 [STATUS](../../../../docs/STATUS.md#实现默认入口部署与验收)。
+
+### IMU 区间覆盖
+
+传播、快速预测和 ZUPT 均要求真实采样覆盖请求区间的起止边界，区间内相邻采样间隔不超过 100 ms。缺少边界或内部缺样时拒绝更新，不跨缺口插值；保留原状态时间、协方差与克隆。请求区间落在最后两个真实采样之间时，仍使用这两个采样插值，不外推。测试位于 ov_msckf/test/test_imu_coverage.cpp。
